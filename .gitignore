@@ -3,3 +3,4 @@ venv
 bin
 lib
 lib64
+pam_rest_auth_conf.py
