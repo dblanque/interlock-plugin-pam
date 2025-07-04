@@ -8,7 +8,6 @@ import syslog
 from typing import Protocol, Optional, Any
 import traceback
 import subprocess
-
 try:
 	from pam import pam
 	from pam.__internals import PamMessage, PamResponse, PAM_AUTH_ERR
@@ -16,13 +15,19 @@ except ImportError as e:
 	syslog.syslog(syslog.LOG_ERR, f"PAM Import Error: {str(e)}")
 	raise
 
+# Setup API_URL
+API_URL = None
+try:
+	from pam_rest_auth_conf import API_URL
+except ImportError:
+	pass
+
 def signal_handler(signal, frame):
 	print('User cancelled authentication.')
 	sys.exit(PAM_AUTH_ERR)
 
 signal.signal(signal.SIGINT, signal_handler)
 
-API_URL = ""
 class PamHandleProtocol(Protocol):
 	"""Protocol defining the PAM handle interface"""
 	PAM_SUCCESS: int
@@ -61,6 +66,10 @@ class RESTAuthPAM:
 	def authenticate(self, username: str, password: str) -> bool:
 		"""Authenticate against REST API with proper type hints"""
 		try:
+			if not API_URL:
+				return False
+			if not password:
+				return False
 			payload = {
 				"username": username,
 				"password": password
