@@ -28,12 +28,11 @@ def signal_handler(signal, frame):
     print("User cancelled authentication.")
     sys.exit(PAM_AUTH_ERR)
 
-
 signal.signal(signal.SIGINT, signal_handler)
 
 
 class PamHandleProtocol(Protocol):
-    """Protocol defining the PAM handle interface"""
+    """Protocol partially defining the PAM handle interface"""
 
     PAM_SUCCESS: int
     PAM_AUTH_ERR: int
