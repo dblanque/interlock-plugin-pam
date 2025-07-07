@@ -22,6 +22,8 @@ UNSAFE_AUTH: bool = False
 SEND_ENCRYPTED: str = ""
 RECV_EXPECTED: str = ""
 try:
+	if "/usr/share/pam-python/" not in sys.path:
+		sys.path.append("/usr/share/pam-python/")
 	from pam_rest_auth_conf import (
 		API_URL,
 		UNSAFE_AUTH,
@@ -84,8 +86,10 @@ class RESTAuthPAM:
 		"""Authenticate against REST API with proper type hints"""
 		try:
 			if not API_URL:
+				self.log(f"Improperly Configured: API_URL is required.")
 				return False
 			if not password:
+				self.log(f"No password provided, ignoring.")
 				return False
 			payload = {
 				"username": username,
@@ -111,6 +115,9 @@ class RESTAuthPAM:
 				return True
 			elif response.status_code == 428:
 				return self._handle_totp_flow(username, password)
+			elif not response.ok:
+				json_resp = response.json()
+				self.log(str(json_resp))
 
 			self.log(
 				f"Failed authentication (Status: {response.status_code})",
@@ -132,11 +139,20 @@ class RESTAuthPAM:
 		try:
 			data = response.json()
 			if not isinstance(data, dict):
+				self.log(
+					f"Response data key must be of type dict (Status: {response.status_code})"
+				)
 				return False
 			if not UNSAFE_AUTH:
 				if data.get("cross_check_key") != RECV_EXPECTED:
+					self.log(
+						f"Failed cross-check key comparison (Status: {response.status_code})"
+					)
 					return False
 		except requests.exceptions.JSONDecodeError:
+			self.log(
+				f"Failed to decode response (Status: {response.status_code})"
+			)
 			return False
 		return True
 
@@ -190,7 +206,9 @@ class RESTAuthPAM:
 					json={
 						"username": username,
 						"password": password,
-						"totp_code": totp,
+						"totp_code": int(totp.strip()),
+						"unsafe": True if UNSAFE_AUTH else False,
+						"cross_check_key": SEND_ENCRYPTED,
 					},
 					timeout=5,
 				)
@@ -200,6 +218,9 @@ class RESTAuthPAM:
 						return False
 					self._ensure_local_user_exists(username)
 					return True
+				elif not response.ok:
+					json_resp = response.json()
+					self.log(str(json_resp))
 
 				self.log(f"TOTP attempt {attempt + 1} failed")
 
