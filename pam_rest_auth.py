@@ -17,9 +17,17 @@ except ImportError as e:
 	raise
 
 # Setup API_URL
-API_URL = None
+API_URL: str = ""
+UNSAFE_AUTH: bool = False
+SEND_ENCRYPTED: str = ""
+RECV_EXPECTED: str = ""
 try:
-	from pam_rest_auth_conf import API_URL
+	from pam_rest_auth_conf import (
+		API_URL,
+		UNSAFE_AUTH,
+		SEND_ENCRYPTED,
+		RECV_EXPECTED,
+	)
 except ImportError:
 	pass
 
@@ -64,7 +72,7 @@ class RESTAuthPAM:
 		# Max TOTP attempts
 		self.totp_retries = 3
 
-	def log(self, message: str, username: str = None) -> None:
+	def log(self, message: str, username: str | None = None) -> None:
 		full_msg = f"PAM-REST: {message}"
 		if username:
 			full_msg = f"PAM-REST [{username}]: {message}"
@@ -79,7 +87,12 @@ class RESTAuthPAM:
 				return False
 			if not password:
 				return False
-			payload = {"username": username, "password": password}
+			payload = {
+				"username": username,
+				"password": password,
+				"unsafe": True if UNSAFE_AUTH else False,
+				"cross_check_key": SEND_ENCRYPTED,
+			}
 			headers = {
 				"Content-Type": "application/json",
 				"Accept": "application/json",
@@ -91,6 +104,8 @@ class RESTAuthPAM:
 			)
 
 			if response.status_code == 200:
+				if not self._handle_cross_check(response=response):
+					return False
 				self.log("Successful authentication", username)
 				self._ensure_local_user_exists(username)
 				return True
@@ -112,6 +127,18 @@ class RESTAuthPAM:
 		except Exception as e:
 			self.log(f"Unexpected error during authentication: {str(e)}")
 			return False
+
+	def _handle_cross_check(self, response: requests.Response):
+		try:
+			data = response.json()
+			if not isinstance(data, dict):
+				return False
+			if not UNSAFE_AUTH:
+				if data.get("cross_check_key") != RECV_EXPECTED:
+					return False
+		except requests.exceptions.JSONDecodeError:
+			return False
+		return True
 
 	def _ensure_local_user_exists(self, username: str) -> bool:
 		"""
@@ -169,6 +196,8 @@ class RESTAuthPAM:
 				)
 
 				if response.status_code == 200:
+					if not self._handle_cross_check(response=response):
+						return False
 					self._ensure_local_user_exists(username)
 					return True
 
