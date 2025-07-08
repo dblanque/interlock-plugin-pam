@@ -1,4 +1,3 @@
-import json
 import requests
 import syslog
 import subprocess
@@ -9,6 +8,8 @@ from pam_rest_config import (
 	PAM_REST_CONFIG,
 	DEFAULT_HEADERS,
 )
+import signal
+import sys
 
 class PamHandleProtocol(Protocol):
 	"""Protocol partially defining the PAM handle interface"""
@@ -42,6 +43,13 @@ class PamRestApiAuthenticator:
 		self.service: str = "login"
 		# Max TOTP attempts
 		self.totp_retries = 3
+		signal.signal(signal.SIGINT, self.signal_handler)
+
+	def signal_handler(self, sig, frame):
+		self.log('Authentication cancelled by user')
+		if self.pamh:
+			sys.exit(self.pamh.PAM_ABORT)
+		sys.exit(1)
 
 	def log(self, message: str, username: str | None = None) -> None:
 		full_msg = f"PAM-REST: {message}"
