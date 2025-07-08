@@ -18,10 +18,7 @@ def handle_pam_conv_response(resp):
 				return resp[0].resp
 		elif hasattr(resp, "resp"):
 			return resp.resp
-	raise Exception(
-		"Could not find valid response attribute for PAM Conversation"
-	)
-
+	return None
 
 class PamHandleProtocol(Protocol):
 	"""Protocol partially defining the PAM handle interface"""
