@@ -81,15 +81,34 @@ class PamRestApiAuthenticator:
 				headers=DEFAULT_HEADERS,
 				timeout=5,
 			)
+			# TOTP Code Required Case Handling
+			if response.status_code == 428: # Precondition Required
+				try:
+					data: dict = response.json()
+					code: str | None = data.get("code", None)
+					if not code == "otp_required":
+						return False
+				except ValueError:
+					return False
+				except Exception as e:
+					self.log(
+						"Unhandled Exception parsing response json (%s)." % (
+							str(e)
+						),
+						username
+					)
 
-			if response.status_code == 200:
+				response = self._handle_totp_flow(username, password)
+				if not response:
+					return False
+
+			# Handle final response
+			if response.status_code == 200: # OK
 				if not self._handle_cross_check(response=response):
 					return False
 				self.log("Successful authentication", username)
 				self._ensure_local_user_exists(username)
 				return True
-			elif response.status_code == 428:
-				return self._handle_totp_flow(username, password)
 			else:
 				self.log_json_response(response=response)
 
@@ -102,7 +121,7 @@ class PamRestApiAuthenticator:
 		except requests.exceptions.RequestException as e:
 			self.log(f"API request failed: {str(e)}")
 			return False
-		except json.JSONDecodeError as e:
+		except ValueError as e:
 			self.log(f"Invalid API response: {str(e)}")
 			return False
 		except Exception as e:
@@ -167,7 +186,7 @@ class PamRestApiAuthenticator:
 				self.log(f"Failed to create user {username}: {str(e)}")
 				return False
 
-	def _handle_totp_flow(self, username: str, password: str) -> bool:
+	def _handle_totp_flow(self, username: str, password: str) -> requests.Response | None:
 		"""Handle TOTP authentication flow"""
 		for attempt in range(self.totp_retries):
 			try:
@@ -190,20 +209,13 @@ class PamRestApiAuthenticator:
 					timeout=5,
 				)
 
-				if response.status_code == 200:
-					if not self._handle_cross_check(response=response):
-						return False
-					self._ensure_local_user_exists(username)
-					return True
-				else:
+				if not response.status_code == 200:
+					self.log(f"TOTP attempt {attempt + 1} failed")
 					self.log_json_response(response=response)
-
-				self.log(f"TOTP attempt {attempt + 1} failed")
-
+				return response
 			except Exception as e:
 				self.log(f"TOTP error: {str(e)}")
-
-		return False
+		return None
 
 	def _get_totp_from_user(self) -> str:
 		"""TOTP prompt handling"""
