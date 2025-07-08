@@ -2,6 +2,7 @@ import json
 import requests
 import syslog
 import subprocess
+import sys
 from typing import Protocol, overload, Any, Optional
 from pam import pam
 from pam.__internals import PamMessage, PamResponse
@@ -9,7 +10,13 @@ from pam_rest_config import (
 	PAM_REST_CONFIG,
 	DEFAULT_HEADERS,
 )
+import signal
 
+try:
+	from pam.__internals import PAM_ABORT
+except ImportError as e:
+	syslog.syslog(syslog.LOG_ERR, f"PAM Import Error: {str(e)}")
+	raise
 
 def handle_pam_conv_response(resp):
 	if resp:
@@ -45,12 +52,18 @@ class PamHandleProtocol(Protocol):
 
 class PamRestApiAuthenticator:
 	def __init__(self, pamh=None, debug: bool = False):
+		signal.signal(signal.SIGINT, self.handle_interrupt)
 		self.pam = pam()
 		self.pamh: PamHandleProtocol | None = pamh
 		self.debug: bool = debug
 		self.service: str = "login"
 		# Max TOTP attempts
 		self.totp_retries = 3
+
+	def handle_interrupt(self, signum, frame):
+		"""Handle CTRL+C gracefully."""
+		print("Authentication cancelled by user.", file=sys.stderr)
+		sys.exit(PAM_ABORT)  # Return non-zero to indicate failure
 
 	def log(self, message: str, username: str | None = None) -> None:
 		full_msg = f"PAM-REST: {message}"

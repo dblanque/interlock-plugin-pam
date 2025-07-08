@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # Deb packages: python3-pam python3-requests python3-pampy libpam-python
-import signal
 import sys
 import syslog
 import traceback
@@ -16,23 +15,7 @@ from PamRestApiAuthenticator import (  # noqa: E402
 	handle_pam_conv_response,
 )
 
-try:
-	from pam.__internals import PAM_ABORT
-except ImportError as e:
-	syslog.syslog(syslog.LOG_ERR, f"PAM Import Error: {str(e)}")
-	raise
-
 PamHandle = PamHandleProtocol
-
-
-# Handle CTRL+C Interrupt
-def signal_handler(signal, frame):
-	print("User cancelled authentication.")
-	sys.exit(PAM_ABORT)
-
-
-signal.signal(signal.SIGINT, signal_handler)
-
 
 def pam_sm_authenticate(
 	pamh: PamHandleProtocol, flags: int, argv: list[str]
