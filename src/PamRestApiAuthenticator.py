@@ -10,15 +10,6 @@ from pam_rest_config import (
 	DEFAULT_HEADERS,
 )
 
-def handle_pam_conv_response(resp):
-	if resp:
-		if isinstance(resp, list):
-			if hasattr(resp[0], "resp"):
-				return resp[0].resp
-		elif hasattr(resp, "resp"):
-			return resp.resp
-	return None
-
 class PamHandleProtocol(Protocol):
 	"""Protocol partially defining the PAM handle interface"""
 
@@ -227,9 +218,13 @@ class PamRestApiAuthenticator:
 				msg = self.pamh.Message(prompt, self.pamh.PAM_PROMPT_ECHO_ON)
 			except TypeError:
 				msg = self.pamh.Message(self.pamh.PAM_PROMPT_ECHO_ON, prompt)
-			resp = handle_pam_conv_response(self.pamh.conversation([msg]))
+			resp = self.pamh.conversation([msg])
 			if resp:
-				return resp
+				if isinstance(resp, list):
+					if hasattr(resp[0], "resp"):
+						return resp[0].resp
+				elif hasattr(resp, "resp"):
+					return resp.resp
 
 			# Fallback to console if conversation() fails
 			self.log("PAM conversation failed, falling back to console")

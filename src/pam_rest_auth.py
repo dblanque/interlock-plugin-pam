@@ -12,7 +12,6 @@ from pam_rest_config import PAM_REST_CONFIG  # noqa: E402
 from PamRestApiAuthenticator import (  # noqa: E402
 	PamRestApiAuthenticator,
 	PamHandleProtocol,
-	handle_pam_conv_response,
 )
 
 PamHandle = PamHandleProtocol
@@ -41,9 +40,13 @@ def pam_sm_authenticate(
 			msg = pamh.Message(prompt, pamh.PAM_PROMPT_ECHO_OFF)
 		except TypeError:
 			msg = pamh.Message(pamh.PAM_PROMPT_ECHO_OFF, prompt)
-		resp = handle_pam_conv_response(pamh.conversation([msg]))
+		resp = pamh.conversation([msg])
 		if resp:
-			password = resp
+			if isinstance(resp, list):
+				if hasattr(resp[0], "resp"):
+					password = resp[0].resp
+			elif hasattr(resp, "resp"):
+				password = resp.resp
 
 		if not password:
 			syslog.syslog(
