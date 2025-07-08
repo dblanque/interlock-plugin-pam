@@ -5,7 +5,7 @@ import subprocess
 from typing import Protocol, overload, Any, Optional
 from pam import pam
 from pam.__internals import PamMessage, PamResponse
-from .pam_rest_config import (
+from pam_rest_config import (
 	PAM_REST_CONFIG,
 	DEFAULT_HEADERS,
 )
