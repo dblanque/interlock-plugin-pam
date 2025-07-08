@@ -16,7 +16,7 @@ class PamRestConfig:
 
 PAM_REST_CONFIG = PamRestConfig()
 config_parser = ConfigParser()
-config_parser.read(os.path.join(FILE_PATH, "pam_rest_auth_conf.ini"))
+config_parser.read(os.path.join(FILE_PATH, "config.ini"))
 main_section = config_parser["MAIN"]
 for attr in PamRestConfig.__dataclass_fields__.keys():
 	if isinstance(getattr(PAM_REST_CONFIG, attr), bool):
