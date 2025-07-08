@@ -219,12 +219,8 @@ class PamRestApiAuthenticator:
 			except TypeError:
 				msg = self.pamh.Message(self.pamh.PAM_PROMPT_ECHO_ON, prompt)
 			resp = self.pamh.conversation([msg])
-			if resp:
-				if isinstance(resp, list):
-					if hasattr(resp[0], "resp"):
-						return resp[0].resp
-				elif hasattr(resp, "resp"):
-					return resp.resp
+			if resp and hasattr(resp[0], "resp"): # type: ignore
+				return resp[0].resp # type: ignore
 
 			# Fallback to console if conversation() fails
 			self.log("PAM conversation failed, falling back to console")

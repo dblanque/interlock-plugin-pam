@@ -41,12 +41,8 @@ def pam_sm_authenticate(
 		except TypeError:
 			msg = pamh.Message(pamh.PAM_PROMPT_ECHO_OFF, prompt)
 		resp = pamh.conversation([msg])
-		if resp:
-			if isinstance(resp, list):
-				if hasattr(resp[0], "resp"):
-					password = resp[0].resp
-			elif hasattr(resp, "resp"):
-				password = resp.resp
+		if resp and hasattr(resp[0], "resp"): # type: ignore
+			password = resp[0].resp # type: ignore
 
 		if not password:
 			syslog.syslog(
