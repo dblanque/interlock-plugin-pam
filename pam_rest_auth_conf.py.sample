@@ -1,4 +1,0 @@
-API_URL="https://interlock.example.com/api/auth/linux-pam/"
-UNSAFE_AUTH=False # Set to True if you wish to ignore Cross-check key
-SEND_ENCRYPTED="" # Add your SEND_ENCRYPTED key here
-RECV_EXPECTED="" # Add your RECV_EXPECTED key here

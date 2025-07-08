@@ -1,257 +1,37 @@
 #!/usr/bin/env python3
 # Deb packages: python3-pam python3-requests python3-pampy libpam-python
-import json
-import requests
 import signal
 import sys
 import syslog
-from typing import Protocol, Optional, Any
 import traceback
-import subprocess
+import os
+
+SCRIPT_PATH = os.path.dirname(os.path.realpath(__file__))
+if SCRIPT_PATH not in sys.path:
+	sys.path.append(SCRIPT_PATH)
+from pam_rest_config import PAM_REST_CONFIG  # noqa: E402
+from PamRestApiAuthenticator import (  # noqa: E402
+	PamRestApiAuthenticator,
+	PamHandleProtocol,
+	handle_pam_conv_response,
+)
 
 try:
-	from pam import pam
-	from pam.__internals import PamMessage, PamResponse, PAM_AUTH_ERR
+	from pam.__internals import PAM_ABORT
 except ImportError as e:
 	syslog.syslog(syslog.LOG_ERR, f"PAM Import Error: {str(e)}")
 	raise
 
-# Setup API_URL
-API_URL: str = ""
-UNSAFE_AUTH: bool = False
-SEND_ENCRYPTED: str = ""
-RECV_EXPECTED: str = ""
-try:
-	if "/usr/share/pam-python/" not in sys.path:
-		sys.path.append("/usr/share/pam-python/")
-	from pam_rest_auth_conf import (
-		API_URL,
-		UNSAFE_AUTH,
-		SEND_ENCRYPTED,
-		RECV_EXPECTED,
-	)
-except ImportError:
-	pass
-
-
-def signal_handler(signal, frame):
-	print("User cancelled authentication.")
-	sys.exit(PAM_AUTH_ERR)
-
-
-signal.signal(signal.SIGINT, signal_handler)
-
-
-class PamHandleProtocol(Protocol):
-	"""Protocol partially defining the PAM handle interface"""
-
-	PAM_SUCCESS: int
-	PAM_AUTH_ERR: int
-	PAM_SYSTEM_ERR: int
-	PAM_USER_UNKNOWN: int
-	PAM_AUTHTOK_ERR: int
-	PAM_PROMPT_ECHO_ON: int
-	PAM_PROMPT_ECHO_OFF: int
-	exception: Any
-	Message: PamMessage
-
-	def get_user(self) -> Optional[str]: ...
-	def get_authtok(self) -> Optional[str]: ...
-	def conversation(
-		self, messages: PamMessage | list[PamMessage]
-	) -> PamResponse | list[PamResponse]: ...
-
-
 PamHandle = PamHandleProtocol
 
 
-class RESTAuthPAM:
-	def __init__(self, pamh=None, debug: bool = False):
-		self.pam = pam()
-		self.pamh: PamHandle | None = pamh
-		self.debug: bool = debug
-		self.service: str = "login"
-		# Max TOTP attempts
-		self.totp_retries = 3
+# Handle CTRL+C Interrupt
+def signal_handler(signal, frame):
+	print("User cancelled authentication.")
+	sys.exit(PAM_ABORT)
 
-	def log(self, message: str, username: str | None = None) -> None:
-		full_msg = f"PAM-REST: {message}"
-		if username:
-			full_msg = f"PAM-REST [{username}]: {message}"
-		syslog.syslog(syslog.LOG_INFO, full_msg)
-		if self.debug:
-			print(full_msg)  # For console debugging
 
-	def authenticate(self, username: str, password: str) -> bool:
-		"""Authenticate against REST API with proper type hints"""
-		try:
-			if not API_URL:
-				self.log(f"Improperly Configured: API_URL is required.")
-				return False
-			if not password:
-				self.log(f"No password provided, ignoring.")
-				return False
-			payload = {
-				"username": username,
-				"password": password,
-				"unsafe": True if UNSAFE_AUTH else False,
-				"cross_check_key": SEND_ENCRYPTED,
-			}
-			headers = {
-				"Content-Type": "application/json",
-				"Accept": "application/json",
-			}
-
-			self.log("Attempting authentication", username)
-			response = requests.post(
-				API_URL, json=payload, headers=headers, timeout=5
-			)
-
-			if response.status_code == 200:
-				if not self._handle_cross_check(response=response):
-					return False
-				self.log("Successful authentication", username)
-				self._ensure_local_user_exists(username)
-				return True
-			elif response.status_code == 428:
-				return self._handle_totp_flow(username, password)
-			elif not response.ok:
-				json_resp = response.json()
-				self.log(str(json_resp))
-
-			self.log(
-				f"Failed authentication (Status: {response.status_code})",
-				username,
-			)
-			return False
-
-		except requests.exceptions.RequestException as e:
-			self.log(f"API request failed: {str(e)}")
-			return False
-		except json.JSONDecodeError as e:
-			self.log(f"Invalid API response: {str(e)}")
-			return False
-		except Exception as e:
-			self.log(f"Unexpected error during authentication: {str(e)}")
-			return False
-
-	def _handle_cross_check(self, response: requests.Response):
-		try:
-			data = response.json()
-			if not isinstance(data, dict):
-				self.log(
-					f"Response data key must be of type dict (Status: {response.status_code})"
-				)
-				return False
-			if not UNSAFE_AUTH:
-				if data.get("cross_check_key") != RECV_EXPECTED:
-					self.log(
-						f"Failed cross-check key comparison (Status: {response.status_code})"
-					)
-					return False
-		except requests.exceptions.JSONDecodeError:
-			self.log(
-				f"Failed to decode response (Status: {response.status_code})"
-			)
-			return False
-		return True
-
-	def _ensure_local_user_exists(self, username: str) -> bool:
-		"""
-		Creates a minimal local user if it doesn't exist.
-		Returns True if user exists or was created successfully.
-		"""
-		try:
-			# Check if user exists
-			subprocess.run(
-				["id", username],
-				check=True,
-				stdout=subprocess.DEVNULL,
-				stderr=subprocess.DEVNULL,
-			)
-			self.log(f"User {username} already exists locally")
-			return True
-
-		except subprocess.CalledProcessError:
-			# User doesn't exist → create it
-			try:
-				self.log(f"Creating local user: {username}")
-				subprocess.run(
-					[
-						"sudo",
-						"useradd",
-						"-r",  # System user (no home dir)
-						"-s",
-						"/bin/false",  # No shell access
-						username,
-					],
-					check=True,
-				)
-				return True
-
-			except subprocess.CalledProcessError as e:
-				self.log(f"Failed to create user {username}: {str(e)}")
-				return False
-
-	def _handle_totp_flow(self, username: str, password: str) -> bool:
-		"""Handle TOTP authentication flow"""
-		for attempt in range(self.totp_retries):
-			try:
-				# Get TOTP from user via PAM conversation
-				totp = self._get_totp_from_user()
-
-				# Verify TOTP with API
-				response = requests.post(
-					API_URL,
-					json={
-						"username": username,
-						"password": password,
-						"totp_code": int(totp.strip()),
-						"unsafe": True if UNSAFE_AUTH else False,
-						"cross_check_key": SEND_ENCRYPTED,
-					},
-					timeout=5,
-				)
-
-				if response.status_code == 200:
-					if not self._handle_cross_check(response=response):
-						return False
-					self._ensure_local_user_exists(username)
-					return True
-				elif not response.ok:
-					json_resp = response.json()
-					self.log(str(json_resp))
-
-				self.log(f"TOTP attempt {attempt + 1} failed")
-
-			except Exception as e:
-				self.log(f"TOTP error: {str(e)}")
-
-		return False
-
-	def _get_totp_from_user(self) -> str:
-		"""TOTP prompt handling"""
-		prompt = "Please enter your 2FA code: "
-
-		if not hasattr(self, "pamh") or not self.pamh:
-			return input(prompt)  # Fallback for testing
-
-		try:
-			# Try conversation() first
-			try:
-				msg = self.pamh.Message(prompt, self.pamh.PAM_PROMPT_ECHO_ON)
-			except TypeError:
-				msg = self.pamh.Message(self.pamh.PAM_PROMPT_ECHO_ON, prompt)
-			resp = self.pamh.conversation([msg])
-			if resp and resp[0].resp:
-				return resp[0].resp
-
-			# Fallback to console if conversation() fails
-			self.log("PAM conversation failed, falling back to console")
-			return input(prompt)
-		except Exception as e:
-			self.log(f"TOTP prompt failed: {str(e)}")
-			return ""
+signal.signal(signal.SIGINT, signal_handler)
 
 
 def pam_sm_authenticate(
@@ -259,7 +39,10 @@ def pam_sm_authenticate(
 ) -> int:
 	try:
 		# Get and validate username first
-		username = pamh.get_user(None)
+		try:
+			username = pamh.get_user(None)
+		except pamh.exception as e:
+			return e.pam_result
 		if not username:
 			return pamh.PAM_USER_UNKNOWN
 
@@ -270,14 +53,14 @@ def pam_sm_authenticate(
 
 		# Get password
 		password = None
-		prompt = "Interlock IdP Password: "
+		prompt = f"{PAM_REST_CONFIG.PROMPT_LABEL}: "
 		try:
 			msg = pamh.Message(prompt, pamh.PAM_PROMPT_ECHO_OFF)
 		except TypeError:
 			msg = pamh.Message(pamh.PAM_PROMPT_ECHO_OFF, prompt)
-		resp = pamh.conversation([msg])
-		if resp and resp[0].resp:
-			password = resp[0].resp
+		resp = handle_pam_conv_response(pamh.conversation([msg]))
+		if resp:
+			password = resp
 
 		if not password:
 			syslog.syslog(
@@ -285,7 +68,7 @@ def pam_sm_authenticate(
 			)
 			return pamh.PAM_AUTH_ERR
 		# Initialize authenticator with PAM handle
-		authenticator = RESTAuthPAM(pamh=pamh)
+		authenticator = PamRestApiAuthenticator(pamh=pamh)
 
 		if not authenticator.authenticate(username, password):
 			syslog.syslog(
@@ -299,10 +82,12 @@ def pam_sm_authenticate(
 	except Exception as e:
 		syslog.syslog(
 			syslog.LOG_ERR,
-			"PAM-REST: System error for %s: %s\n%s",
-			username,
-			str(e),
-			traceback.print_exc(),
+			"PAM-REST: System error for %s: %s\n%s"
+			% (
+				username,
+				str(e),
+				traceback.print_exc(),
+			),
 		)
 		return pamh.PAM_SYSTEM_ERR
 
