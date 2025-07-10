@@ -119,6 +119,7 @@ class PamRestApiAuthenticator:
 				self.log("Successful authentication", username)
 				self._ensure_local_user_exists(username)
 				self._enforce_local_user_shell(username)
+				self._enforce_local_user_home_permissions(username)
 				return True
 			else:
 				self.log_json_response(response=response)
@@ -166,6 +167,25 @@ class PamRestApiAuthenticator:
 			)
 			return False
 		return True
+
+	def _enforce_local_user_home_permissions(self, username: str) -> bool:
+		try:
+			self.log(f"Checking user home directory permissions for {username}")
+			subprocess.run(
+				[
+					"sudo",
+					"/usr/bin/chown",
+					"%s:%s" % (username, username),
+					"/home/%s" % username,
+				],
+				check=True,
+				stdout=subprocess.DEVNULL,
+			)
+			return True
+
+		except subprocess.CalledProcessError as e:
+			self.log(f"Failed to create user {username}: {str(e)}")
+			return False
 
 	def _ensure_local_user_exists(self, username: str) -> bool:
 		"""
