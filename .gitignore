@@ -9,5 +9,4 @@
 **.cache
 **/config.ini
 **/user_shells.ini
-.vscode
 .coverage
