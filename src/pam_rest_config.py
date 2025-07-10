@@ -55,6 +55,7 @@ def get_main_config() -> PamRestConfig:
 	if config_parser.has_section("MAIN"):
 		for dataclass_field in PamRestConfig.__dataclass_fields__.keys():
 			_default_v = getattr(_pam_rest_config, dataclass_field)
+			_v_type = None
 			if _default_v is not None:
 				_v_type = type(_default_v)
 
