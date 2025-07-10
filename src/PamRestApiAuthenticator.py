@@ -10,6 +10,7 @@ from pam_rest_config import (
 	USER_SHELL_CONFIG,
 	DEFAULT_HEADERS,
 )
+import os
 import signal
 import sys
 
@@ -119,6 +120,7 @@ class PamRestApiAuthenticator:
 				self.log("Successful authentication", username)
 				self._ensure_local_user_exists(username)
 				self._enforce_local_user_shell(username)
+				self._ensure_local_user_home_dir_exists(username)
 				self._enforce_local_user_home_permissions(username)
 				return True
 			else:
@@ -168,6 +170,14 @@ class PamRestApiAuthenticator:
 			return False
 		return True
 
+	def _get_user_homedir(self, username: str) -> str:
+		return "/home/%s" % username
+
+	def _ensure_local_user_home_dir_exists(self, username: str) -> bool:
+		home_dir = self._get_user_homedir(username)
+		if not os.path.exists(home_dir):
+			os.makedirs(home_dir)
+
 	def _enforce_local_user_home_permissions(self, username: str) -> bool:
 		try:
 			self.log(f"Checking user home directory permissions for {username}")
@@ -176,7 +186,7 @@ class PamRestApiAuthenticator:
 					"sudo",
 					"/usr/bin/chown",
 					"%s:%s" % (username, username),
-					"/home/%s" % username,
+					self._get_user_homedir(username),
 				],
 				check=True,
 				stdout=subprocess.DEVNULL,
@@ -214,7 +224,7 @@ class PamRestApiAuthenticator:
 						"--shell",
 						USER_SHELL_FALLBACK,  # No shell access
 						"--home-dir",
-						"/home/%s" % username,
+						self._get_user_homedir(username),
 						username,
 					],
 					check=True,
@@ -247,7 +257,7 @@ class PamRestApiAuthenticator:
 					"--shell",
 					user_shell,  # No shell access
 					"--home",
-					"/home/%s" % username,
+					self._get_user_homedir(username),
 					"--move-home",
 					username,
 				],
