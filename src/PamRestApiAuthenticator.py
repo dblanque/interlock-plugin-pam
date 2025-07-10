@@ -140,19 +140,26 @@ class PamRestApiAuthenticator:
 			return False
 
 	def _handle_cross_check(self, response: requests.Response):
+		if PAM_REST_CONFIG.UNSAFE_AUTH:
+			return True
 		try:
 			data = response.json()
 			if not isinstance(data, dict):
 				self.log(
-					f"Response data key must be of type dict (Status: {response.status_code})"
+					"Response data key must be of type dict (Status: %s)" % (
+						response.status_code
+					)
 				)
 				return False
-			if not PAM_REST_CONFIG.UNSAFE_AUTH:
-				if data.get("cross_check_key") != PAM_REST_CONFIG.RECV_EXPECTED:
-					self.log(
-						f"Failed cross-check key comparison (Status: {response.status_code})"
+
+			cross_chk = data.get("cross_check_key", None)
+			if cross_chk != PAM_REST_CONFIG.RECV_EXPECTED:
+				self.log(
+					"Failed cross-check key comparison (Status: %s)" % (
+						response.status_code
 					)
-					return False
+				)
+				return False
 		except requests.exceptions.JSONDecodeError:
 			self.log(
 				f"Failed to decode response (Status: {response.status_code})"
