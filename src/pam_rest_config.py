@@ -14,6 +14,7 @@ class PamRestConfig:
 	RECV_EXPECTED: str = ""
 	SEND_ENCRYPTED: str = ""
 	PROMPT_LABEL: str = "Interlock IdP Password"
+	TOTP_RETRY_LIMIT: int = 3
 
 
 def get_config_parser(path: str | None = None) -> ConfigParser:

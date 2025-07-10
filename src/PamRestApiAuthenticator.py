@@ -45,7 +45,7 @@ class PamRestApiAuthenticator:
 		self.debug: bool = debug
 		self.service: str = "login"
 		# Max TOTP attempts
-		self.totp_retries = 3
+		self.totp_retries = PAM_REST_CONFIG.TOTP_RETRY_LIMIT
 		signal.signal(signal.SIGINT, self.signal_handler)
 
 	def signal_handler(self, sig, frame):
