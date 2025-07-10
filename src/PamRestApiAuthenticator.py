@@ -193,6 +193,8 @@ class PamRestApiAuthenticator:
 						"/usr/sbin/useradd",
 						"--shell",
 						USER_SHELL_FALLBACK,  # No shell access
+						"--home-dir",
+						"/home/%s" % username,
 						username,
 					],
 					check=True,
@@ -218,12 +220,15 @@ class PamRestApiAuthenticator:
 			user_shell = USER_SHELL_FALLBACK
 
 		try:
-			self.log(f"Enforcing user shell for {username}")
+			self.log(f"Enforcing user homedir and shell for {username}")
 			subprocess.run(
 				[
 					"/usr/sbin/usermod",
 					"--shell",
 					user_shell,  # No shell access
+					"--home",
+					"/home/%s" % username,
+					"--move-home",
 					username,
 				],
 				check=True,
