@@ -190,7 +190,7 @@ class PamRestApiAuthenticator:
 				subprocess.run(
 					[
 						"sudo",
-						"useradd",
+						"/usr/sbin/useradd",
 						"--shell",
 						USER_SHELL_FALLBACK,  # No shell access
 						username,
@@ -220,7 +220,7 @@ class PamRestApiAuthenticator:
 			self.log(f"Enforcing user shell for {username}")
 			subprocess.run(
 				[
-					"usermod",
+					"/usr/sbin/usermod",
 					"--shell",
 					user_shell,  # No shell access
 					username,
