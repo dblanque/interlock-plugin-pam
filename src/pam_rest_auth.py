@@ -16,6 +16,7 @@ from PamRestApiAuthenticator import (  # noqa: E402
 
 PamHandle = PamHandleProtocol
 
+
 def pam_sm_authenticate(
 	pamh: PamHandleProtocol, flags: int, argv: list[str]
 ) -> int:
@@ -41,8 +42,8 @@ def pam_sm_authenticate(
 		except TypeError:
 			msg = pamh.Message(pamh.PAM_PROMPT_ECHO_OFF, prompt)
 		resp = pamh.conversation([msg])
-		if resp and hasattr(resp[0], "resp"): # type: ignore
-			password = resp[0].resp # type: ignore
+		if resp and hasattr(resp[0], "resp"):  # type: ignore
+			password = resp[0].resp  # type: ignore
 
 		if not password:
 			syslog.syslog(

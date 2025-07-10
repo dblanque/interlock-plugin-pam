@@ -13,6 +13,7 @@ from pam_rest_config import (
 import signal
 import sys
 
+
 class PamHandleProtocol(Protocol):
 	"""Protocol partially defining the PAM handle interface"""
 
@@ -48,7 +49,7 @@ class PamRestApiAuthenticator:
 		signal.signal(signal.SIGINT, self.signal_handler)
 
 	def signal_handler(self, sig, frame):
-		self.log('Authentication cancelled by user')
+		self.log("Authentication cancelled by user")
 		if self.pamh:
 			sys.exit(self.pamh.PAM_ABORT)
 		sys.exit(1)
@@ -92,7 +93,7 @@ class PamRestApiAuthenticator:
 				timeout=5,
 			)
 			# TOTP Code Required Case Handling
-			if response.status_code == 428: # Precondition Required
+			if response.status_code == 428:  # Precondition Required
 				try:
 					data: dict = response.json()
 					code: str | None = data.get("code", None)
@@ -102,10 +103,9 @@ class PamRestApiAuthenticator:
 					return False
 				except Exception as e:
 					self.log(
-						"Unhandled Exception parsing response json (%s)." % (
-							str(e)
-						),
-						username
+						"Unhandled Exception parsing response json (%s)."
+						% (str(e)),
+						username,
 					)
 
 				response = self._handle_totp_flow(username, password)
@@ -113,7 +113,7 @@ class PamRestApiAuthenticator:
 					return False
 
 			# Handle final response
-			if response.status_code == 200: # OK
+			if response.status_code == 200:  # OK
 				if not self._handle_cross_check(response=response):
 					return False
 				self.log("Successful authentication", username)
@@ -201,7 +201,8 @@ class PamRestApiAuthenticator:
 		user_shell = USER_SHELL_CONFIG.get(username, None)
 		if user_shell not in USER_SHELL_OPTS or not user_shell:
 			self.log(
-				"Invalid shell for user %s, reverting to %s" % (
+				"Invalid shell for user %s, reverting to %s"
+				% (
 					username,
 					USER_SHELL_FALLBACK,
 				)
@@ -224,7 +225,9 @@ class PamRestApiAuthenticator:
 			self.log(f"Failed to enforce user shell for {username}: {str(e)}")
 			return False
 
-	def _handle_totp_flow(self, username: str, password: str) -> requests.Response | None:
+	def _handle_totp_flow(
+		self, username: str, password: str
+	) -> requests.Response | None:
 		"""Handle TOTP authentication flow"""
 		for attempt in range(self.totp_retries):
 			try:
@@ -269,8 +272,8 @@ class PamRestApiAuthenticator:
 			except TypeError:
 				msg = self.pamh.Message(self.pamh.PAM_PROMPT_ECHO_ON, prompt)
 			resp = self.pamh.conversation([msg])
-			if resp and hasattr(resp[0], "resp"): # type: ignore
-				return resp[0].resp # type: ignore
+			if resp and hasattr(resp[0], "resp"):  # type: ignore
+				return resp[0].resp  # type: ignore
 
 			# Fallback to console if conversation() fails
 			self.log("PAM conversation failed, falling back to console")

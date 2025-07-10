@@ -6,6 +6,7 @@ import os
 FILE_PATH = os.path.dirname(os.path.realpath(__file__))
 CONFIG_FILE = "config.ini"
 
+
 @dataclass
 class PamRestConfig:
 	API_URL: str = ""
@@ -14,6 +15,7 @@ class PamRestConfig:
 	SEND_ENCRYPTED: str = ""
 	PROMPT_LABEL: str = "Interlock IdP Password"
 
+
 def get_config_parser(path: str | None = None) -> ConfigParser:
 	if not path:
 		path = os.path.join(FILE_PATH, CONFIG_FILE)
@@ -21,11 +23,12 @@ def get_config_parser(path: str | None = None) -> ConfigParser:
 	config_parser.read(path)
 	return config_parser
 
+
 def get_config_parser_item(
 	parser: ConfigParser,
 	section_key: str,
 	attr_key: str,
-	attr_type: Type[Union[bool, int, float, str]] | None = None
+	attr_type: Type[Union[bool, int, float, str]] | None = None,
 ):
 	if not isinstance(parser, ConfigParser):
 		raise TypeError("parser must be of type ConfigParser")
@@ -40,8 +43,9 @@ def get_config_parser_item(
 		return section.getint(attr_key, None)
 	elif attr_type is float:
 		return section.getfloat(attr_key, None)
-	else: # String value
+	else:  # String value
 		return section.get(attr_key, None)
+
 
 def get_main_config() -> PamRestConfig:
 	config_parser = get_config_parser()
@@ -63,6 +67,7 @@ def get_main_config() -> PamRestConfig:
 				setattr(_pam_rest_config, dataclass_field, _v)
 	return _pam_rest_config
 
+
 def get_user_shell_config() -> dict:
 	config_parser = get_config_parser(
 		path=os.path.join(FILE_PATH, "user_shells.ini")
@@ -70,6 +75,7 @@ def get_user_shell_config() -> dict:
 	if not config_parser.has_section("SHELLS"):
 		return {}
 	return dict(config_parser["SHELLS"])
+
 
 PAM_REST_CONFIG = get_main_config()
 USER_SHELL_CONFIG = get_user_shell_config()

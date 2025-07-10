@@ -1,6 +1,7 @@
 ########################### Standard Pytest Imports ############################
 import pytest
 from pytest_mock import MockerFixture
+
 ################################################################################
 from configparser import ConfigParser
 import os
@@ -12,6 +13,7 @@ from pam_rest_config import (
 	get_config_parser_item,
 	get_user_shell_config,
 )
+
 
 @pytest.fixture
 def mock_config_functions(
@@ -28,14 +30,15 @@ def mock_config_functions(
 		if k not in skip_patch:
 			mocker.patch(f"pam_rest_config.{k}")
 
+
 @pytest.fixture
 def f_config_parser(mocker: MockerFixture):
 	m_config_parser = mocker.Mock(name="m_config_parser", spec=ConfigParser)
 	m_config_parser_cls = mocker.patch(
-		"pam_rest_config.ConfigParser",
-		return_value=m_config_parser
+		"pam_rest_config.ConfigParser", return_value=m_config_parser
 	)
 	return m_config_parser, m_config_parser_cls
+
 
 class TestGetConfigParser:
 	def test_without_path(self, f_config_parser):
@@ -52,11 +55,12 @@ class TestGetConfigParser:
 		assert result == m_config_parser
 		m_config_parser.read.assert_called_once_with("mock_path")
 
+
 class TestGetConfigParserItem:
 	def test_raises_type_error(self):
 		with pytest.raises(TypeError):
 			get_config_parser_item(
-				parser=None, # type: ignore
+				parser=None,  # type: ignore
 				section_key="mock_section",
 				attr_key="mock_attr",
 			)
@@ -66,7 +70,7 @@ class TestGetConfigParserItem:
 		m_config_parser.sections.return_value = []
 		with pytest.raises(ValueError, match="not in parser"):
 			get_config_parser_item(
-				parser=m_config_parser, # type: ignore
+				parser=m_config_parser,  # type: ignore
 				section_key="mock_section",
 				attr_key="mock_attr",
 			)
@@ -79,7 +83,7 @@ class TestGetConfigParserItem:
 			("getboolean", True, bool),
 			("getint", 1, int),
 			("getfloat", 1.5, float),
-		)
+		),
 	)
 	def test_success_any(
 		self,
@@ -104,12 +108,15 @@ class TestGetConfigParserItem:
 		m_config_parser.__getitem__ = mocker.Mock(return_value=m_section)
 
 		# Assertions
-		assert get_config_parser_item(
-			parser=m_config_parser, # type: ignore
-			section_key="mock_section",
-			attr_key="mock_attr",
-			attr_type=test_type
-		) == expected
+		assert (
+			get_config_parser_item(
+				parser=m_config_parser,  # type: ignore
+				section_key="mock_section",
+				attr_key="mock_attr",
+				attr_type=test_type,
+			)
+			== expected
+		)
 
 		m_config_parser.__getitem__.assert_called_once_with("mock_section")
 		for fn in (
@@ -122,13 +129,13 @@ class TestGetConfigParserItem:
 				getattr(m_section, fn).assert_not_called()
 		target_fn.assert_called_once_with("mock_attr", None)
 
+
 class TestGetUserShellConfig:
 	def test_empty_section(self, mocker: MockerFixture, f_config_parser):
 		m_config_parser, m_config_parser_cls = f_config_parser
 		m_config_parser.has_section.return_value = False
 		m_get_config_parser = mocker.patch(
-			"pam_rest_config.get_config_parser",
-			return_value=m_config_parser
+			"pam_rest_config.get_config_parser", return_value=m_config_parser
 		)
 		assert get_user_shell_config() == {}
 		m_get_config_parser.assert_called_once_with(
@@ -136,14 +143,13 @@ class TestGetUserShellConfig:
 		)
 
 	def test_section_as_dict(self, mocker: MockerFixture, f_config_parser):
-		m_shell_conf = {"testuser":"/bin/false"}
+		m_shell_conf = {"testuser": "/bin/false"}
 		m_config_parser, m_config_parser_cls = f_config_parser
 		m_config_parser.has_section.return_value = True
 		m_config_parser.__getitem__ = mocker.Mock(return_value=m_shell_conf)
 
 		m_get_config_parser = mocker.patch(
-			"pam_rest_config.get_config_parser",
-			return_value=m_config_parser
+			"pam_rest_config.get_config_parser", return_value=m_config_parser
 		)
 		assert get_user_shell_config() == m_shell_conf
 		m_get_config_parser.assert_called_once_with(
