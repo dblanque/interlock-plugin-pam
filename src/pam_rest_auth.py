@@ -45,8 +45,9 @@ def pam_sm_authenticate(
 			resp = pamh.conversation([msg])
 			if resp and hasattr(resp[0], "resp"):  # type: ignore
 				password = resp[0].resp  # type: ignore
-		except KeyboardInterrupt:
+		except Exception as e:
 			syslog.syslog(syslog.LOG_INFO, f"PAM-REST: Auth aborted for {username}")
+			syslog.syslog(syslog.LOG_ERR, f"PAM-REST: Auth abort error ({str(e)})")
 			return pamh.PAM_ABORT
 
 		if not password:
