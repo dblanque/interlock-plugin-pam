@@ -221,6 +221,7 @@ class PamRestApiAuthenticator:
 					[
 						"sudo",
 						"/usr/sbin/useradd",
+						"-D"
 						"--shell",
 						USER_SHELL_FALLBACK,  # No shell access
 						"--home-dir",
