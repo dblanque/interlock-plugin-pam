@@ -61,6 +61,9 @@ def pam_sm_authenticate(
 
 		syslog.syslog(syslog.LOG_INFO, f"PAM-REST: Auth success for {username}")
 		return pamh.PAM_SUCCESS
+	except KeyboardInterrupt:
+		syslog.syslog(syslog.LOG_INFO, f"PAM-REST: Auth aborted for {username}")
+		return pamh.PAM_ABORT
 	except Exception as e:
 		syslog.syslog(
 			syslog.LOG_ERR,
