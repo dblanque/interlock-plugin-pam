@@ -196,6 +196,7 @@ class PamRestApiAuthenticator:
 						username,
 					],
 					check=True,
+					stdout=subprocess.DEVNULL,
 				)
 				return True
 
@@ -226,6 +227,7 @@ class PamRestApiAuthenticator:
 					username,
 				],
 				check=True,
+				stdout=subprocess.DEVNULL,
 			)
 			return True
 		except subprocess.CalledProcessError as e:
