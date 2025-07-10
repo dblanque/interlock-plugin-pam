@@ -4,8 +4,10 @@ import subprocess
 from typing import Protocol, overload, Any, Optional
 from pam import pam
 from pam.__internals import PamMessage, PamResponse
+from constants import USER_SHELL_OPTS, USER_SHELL_FALLBACK
 from pam_rest_config import (
 	PAM_REST_CONFIG,
+	USER_SHELL_CONFIG,
 	DEFAULT_HEADERS,
 )
 import signal
@@ -116,6 +118,7 @@ class PamRestApiAuthenticator:
 					return False
 				self.log("Successful authentication", username)
 				self._ensure_local_user_exists(username)
+				self._enforce_local_user_shell(username)
 				return True
 			else:
 				self.log_json_response(response=response)
@@ -181,9 +184,8 @@ class PamRestApiAuthenticator:
 					[
 						"sudo",
 						"useradd",
-						"-r",  # System user (no home dir)
-						"-s",
-						"/bin/false",  # No shell access
+						"--shell",
+						USER_SHELL_FALLBACK,  # No shell access
 						username,
 					],
 					check=True,
@@ -193,6 +195,34 @@ class PamRestApiAuthenticator:
 			except subprocess.CalledProcessError as e:
 				self.log(f"Failed to create user {username}: {str(e)}")
 				return False
+
+	def _enforce_local_user_shell(self, username: str) -> bool:
+		"""Enforces local user shell to configured parameter (if valid)."""
+		user_shell = USER_SHELL_CONFIG.get(username, None)
+		if user_shell not in USER_SHELL_OPTS or not user_shell:
+			self.log(
+				"Invalid shell for user %s, reverting to %s" % (
+					username,
+					USER_SHELL_FALLBACK,
+				)
+			)
+			user_shell = USER_SHELL_FALLBACK
+
+		try:
+			self.log(f"Enforcing user shell for {username}")
+			subprocess.run(
+				[
+					"usermod",
+					"--shell",
+					user_shell,  # No shell access
+					username,
+				],
+				check=True,
+			)
+			return True
+		except subprocess.CalledProcessError as e:
+			self.log(f"Failed to enforce user shell for {username}: {str(e)}")
+			return False
 
 	def _handle_totp_flow(self, username: str, password: str) -> requests.Response | None:
 		"""Handle TOTP authentication flow"""
