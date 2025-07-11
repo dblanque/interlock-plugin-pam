@@ -30,7 +30,6 @@ def pam_sm_authenticate(
 			return pamh.PAM_USER_UNKNOWN
 
 
-		# Sudo uses on-login synced credentials
 		if pamh.service == "sudo":
 			syslog.syslog(
 				syslog.LOG_INFO,
@@ -38,16 +37,15 @@ def pam_sm_authenticate(
 					username,
 				)
 			)
-			return pamh.PAM_IGNORE
-
-		# Log authentication attempt with user
-		syslog.syslog(
-			syslog.LOG_INFO,
-			"PAM-REST: Authentication attempt for user %s (service: %s)" % (
-				username,
-				pamh.service,
+		else:
+			# Log authentication attempt with user
+			syslog.syslog(
+				syslog.LOG_INFO,
+				"PAM-REST: Authentication attempt for user %s (service: %s)" % (
+					username,
+					pamh.service,
+				)
 			)
-		)
 
 		# Get password
 		password = None
