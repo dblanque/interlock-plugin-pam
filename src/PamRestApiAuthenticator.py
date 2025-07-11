@@ -90,8 +90,6 @@ class PamRestApiAuthenticator:
 			return False
 		if self.interrupted:
 			return False
-		if self.service == "sudo":
-			return False
 		if os.geteuid() != 0:
 			raise PermissionError("Interlock PAM Plugin requires root.")
 
@@ -139,34 +137,42 @@ class PamRestApiAuthenticator:
 				if not self._handle_cross_check(response=response):
 					return False
 				data = self.get_response_json(response=response)
+				is_superuser = data.get("is_superuser", False)
 
 				# On successful user authentication
 				self.log("Successful authentication", username)
 				self.ensure_user_exists(username)
-				# Always enforce most recent sudo rights
-				self.set_superuser_status(
-					username=username, desired=data.get("is_superuser", False)
-				)
-				self.set_user_password(username, password)
-				shell_enforced = self._enforce_user_shell(username=username)
-				homedir_exists = self._ensure_user_homedir_exists(
-					username=username
-				)
-				homedir_perms_ok = self._enforce_user_homedir_permissions(
-					username=username
-				)
+				# Local sudoer permissions should be set on login.
+				if self.service == "sudo":
+					if not is_superuser:
+						return False
+					return True
 
-				# Check if all procedures ok.
-				return all(
-					[
-						v is True
-						for v in (
-							shell_enforced,
-							homedir_exists,
-							homedir_perms_ok,
-						)
-					]
-				)
+				if self.service == "login":
+					# Always enforce most recent sudo rights
+					self.set_superuser_status(
+						username=username, desired=is_superuser)
+					self.set_user_password(username, password)
+					shell_enforced = self._enforce_user_shell(username=username)
+					homedir_exists = self._ensure_user_homedir_exists(
+						username=username
+					)
+					homedir_perms_ok = self._enforce_user_homedir_permissions(
+						username=username
+					)
+
+					# Check if all procedures ok.
+					return all(
+						[
+							v is True
+							for v in (
+								shell_enforced,
+								homedir_exists,
+								homedir_perms_ok,
+							)
+						]
+					)
+				return True
 			else:
 				self.log_json_response(response=response)
 
