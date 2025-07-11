@@ -305,7 +305,7 @@ class PamRestApiAuthenticator:
 
 			# Add/Remove user from sudoers if required
 			cmd = [
-				"gpasswd",
+				"/usr/bin/gpasswd",
 				"--add" if desired else "--delete",
 				username,
 				"sudo",
@@ -352,7 +352,7 @@ class PamRestApiAuthenticator:
 		try:
 			# Check if user exists
 			subprocess.run(
-				["id", username],
+				["/usr/bin/id", username],
 				check=True,
 				stdout=subprocess.DEVNULL,
 				stderr=subprocess.DEVNULL,
