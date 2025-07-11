@@ -92,6 +92,9 @@ class PamRestApiAuthenticator:
 			return False
 		if os.geteuid() != 0:
 			raise PermissionError("Interlock PAM Plugin requires root.")
+
+		# Transform to lower and validate that it's not root
+		username = username.lower()
 		if username == "root":
 			raise PermissionError("root cannot be a remotely authenticated user.")
 
