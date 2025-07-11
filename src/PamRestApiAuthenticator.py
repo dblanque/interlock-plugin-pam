@@ -233,7 +233,7 @@ class PamRestApiAuthenticator:
 		try:
 			# Single command check that works across sudo versions
 			result = subprocess.run(
-				["sudo", "-n", "-l", "-U", username],
+				['pkexec', '--user', 'root', 'sudo', '-l', '-U', username],
 				stdout=subprocess.PIPE,
 				stderr=subprocess.PIPE,
 				timeout=5,
