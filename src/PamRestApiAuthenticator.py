@@ -236,12 +236,11 @@ class PamRestApiAuthenticator:
 				["sudo", "-n", "-l", "-U", username],
 				stdout=subprocess.PIPE,
 				stderr=subprocess.PIPE,
-				text=True,
 				timeout=5,
 			)
 
 			# Check both stdout and stderr patterns
-			output = (result.stdout + result.stderr).lower()
+			output = (result.stdout + result.stderr).decode().lower()
 			return (
 				"may run" in output
 				or "allowed to run" in output
