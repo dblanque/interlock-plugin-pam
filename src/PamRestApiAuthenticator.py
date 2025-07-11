@@ -141,7 +141,10 @@ class PamRestApiAuthenticator:
 
 				# On successful user authentication
 				self.log("Successful authentication", username)
-				self.ensure_user_exists(username)
+				user_exists = self.ensure_user_exists(username)
+				if not user_exists:
+					return False
+
 				# Local sudoer permissions should be set on login.
 				if self.service == "sudo":
 					if not is_superuser:
@@ -372,7 +375,8 @@ class PamRestApiAuthenticator:
 				subprocess.run(
 					[
 						"/usr/sbin/useradd",
-						"-D--shell",
+						"-D",
+						"--shell",
 						USER_SHELL_FALLBACK,  # No shell access
 						"--home-dir",
 						self._get_user_homedir(username),
