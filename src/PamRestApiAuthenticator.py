@@ -28,6 +28,7 @@ class PamHandleProtocol(Protocol):
 	PAM_PROMPT_ECHO_ON: int
 	PAM_PROMPT_ECHO_OFF: int
 	exception: Any
+	service: str
 
 	@overload
 	def Message(self, msg_style: int, msg: str): ...
@@ -130,15 +131,22 @@ class PamRestApiAuthenticator:
 					return False
 				data = self.get_response_json(response=response)
 
+				# On successful user authentication
 				self.log("Successful authentication", username)
 				self._ensure_local_user_exists(username)
+				# Always enforce most recent sudo rights
 				self._set_superuser_status(
 					username=username,
 					desired=data.get("is_superuser", False)
 				)
-				self._enforce_local_user_shell(username)
-				self._ensure_local_user_home_dir_exists(username)
-				self._enforce_local_user_home_permissions(username)
+				# If authenticating for sudo
+				if self.service == "sudo":
+					if not self.is_user_in_sudoers(username=username):
+						return False
+				else:
+					self._enforce_local_user_shell(username)
+					self._ensure_local_user_home_dir_exists(username)
+					self._enforce_local_user_home_permissions(username)
 				return True
 			else:
 				self.log_json_response(response=response)
@@ -194,23 +202,38 @@ class PamRestApiAuthenticator:
 		except subprocess.CalledProcessError:
 			return False
 
+	def is_user_in_sudoers(self, username: str):
+		"""Check if user is explicitly in sudoers file"""
+		try:
+			# Use visudo -c to validate sudoers syntax first
+			subprocess.check_call(['visudo', '-c'], 
+								stdout=subprocess.DEVNULL,
+								stderr=subprocess.DEVNULL)
+
+			# Check if user has sudo privileges
+			result = subprocess.run(['sudo', '-l', '-U', username],
+								stdout=subprocess.PIPE,
+								stderr=subprocess.PIPE)
+			return "not allowed" not in result.stderr.decode().lower()
+		except (subprocess.CalledProcessError, FileNotFoundError):
+			return False
+
 	def _set_superuser_status(
 		self,
 		username: str,
 		desired: bool = False
 	) -> bool:
+		"""Updates sudo rights for user if required."""		
+		user_in_sudo = self.is_user_in_sudoers(username=username)
+		if desired is user_in_sudo:
+			return True
+
 		add_or_remove = "-aG" if desired else "-rG"
 		msg = "Enforcing sudo rights for user"\
 			if desired else "Removing sudo rights for user"
 		err_msg = "Failed to enforce sudo rights for user"\
 			if desired else "Failed to remove sudo rights from user"
 
-		user_in_sudo = self.is_user_in_group(
-			username=username,
-			groupname="sudo",
-		)
-		if desired is user_in_sudo:
-			return True
 
 		try:
 			self.log(f"{msg} {username}")

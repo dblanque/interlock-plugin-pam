@@ -59,6 +59,7 @@ def pam_sm_authenticate(
 			return pamh.PAM_AUTH_ERR
 		# Initialize authenticator with PAM handle
 		authenticator = PamRestApiAuthenticator(pamh=pamh)
+		authenticator.service = pamh.service
 
 		if not authenticator.authenticate(username, password):
 			syslog.syslog(
