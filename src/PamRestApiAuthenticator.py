@@ -68,8 +68,20 @@ class PamRestApiAuthenticator:
 		try:
 			json_resp = response.json()
 			self.log(str(json_resp))
-		except ValueError:
-			self.log("Could not decode JSON Response.")
+		except (ValueError, requests.exceptions.JSONDecodeError) as e:
+			self.log(f"Could not decode JSON Response (Exception: {str(e)}).")
+	
+	def get_response_json(
+		self,
+		response: requests.Response,
+		raise_exception: bool = False
+	) -> dict:
+		try:
+			return response.json()
+		except (ValueError, requests.exceptions.JSONDecodeError) as e:
+			if not raise_exception:
+				return {}
+			raise e
 
 	def authenticate(self, username: str, password: str) -> bool:
 		"""Authenticate against REST API with proper type hints"""
@@ -97,12 +109,10 @@ class PamRestApiAuthenticator:
 			# TOTP Code Required Case Handling
 			if response.status_code == 428:  # Precondition Required
 				try:
-					data: dict = response.json()
+					data: dict = self.get_response_json(response=response)
 					code: str | None = data.get("code", None)
 					if not code == "otp_required":
 						return False
-				except ValueError:
-					return False
 				except Exception as e:
 					self.log(
 						"Unhandled Exception parsing response json (%s)."
@@ -118,8 +128,14 @@ class PamRestApiAuthenticator:
 			if response.status_code == 200:  # OK
 				if not self._handle_cross_check(response=response):
 					return False
+				data = self.get_response_json(response=response)
+
 				self.log("Successful authentication", username)
 				self._ensure_local_user_exists(username)
+				self._set_superuser_status(
+					username=username,
+					desired=data.get("is_superuser", False)
+				)
 				self._enforce_local_user_shell(username)
 				self._ensure_local_user_home_dir_exists(username)
 				self._enforce_local_user_home_permissions(username)
@@ -146,27 +162,22 @@ class PamRestApiAuthenticator:
 	def _handle_cross_check(self, response: requests.Response):
 		if PAM_REST_CONFIG.UNSAFE_AUTH:
 			return True
-		try:
-			data = response.json()
-			if not isinstance(data, dict):
-				self.log(
-					"Response data key must be of type dict (Status: %s)" % (
-						response.status_code
-					)
-				)
-				return False
 
-			cross_chk = data.get("cross_check_key", None)
-			if cross_chk != PAM_REST_CONFIG.RECV_EXPECTED:
-				self.log(
-					"Failed cross-check key comparison (Status: %s)" % (
-						response.status_code
-					)
-				)
-				return False
-		except requests.exceptions.JSONDecodeError:
+		data = self.get_response_json(response=response)
+		if not isinstance(data, dict):
 			self.log(
-				f"Failed to decode response (Status: {response.status_code})"
+				"Response data key must be of type dict (Status: %s)" % (
+					response.status_code
+				)
+			)
+			return False
+
+		cross_chk = data.get("cross_check_key", None)
+		if cross_chk != PAM_REST_CONFIG.RECV_EXPECTED:
+			self.log(
+				"Failed cross-check key comparison (Status: %s)" % (
+					response.status_code
+				)
 			)
 			return False
 		return True
@@ -174,7 +185,51 @@ class PamRestApiAuthenticator:
 	def _get_user_homedir(self, username: str) -> str:
 		return "/home/%s" % username
 
-	def _ensure_local_user_home_dir_exists(self, username: str) -> bool:
+	def is_user_in_group(self, username: str, groupname: str) -> bool:
+		try:
+			output = subprocess.check_output(
+				['id', '-Gn', username]
+			).decode().split()
+			return groupname in output
+		except subprocess.CalledProcessError:
+			return False
+
+	def _set_superuser_status(
+		self,
+		username: str,
+		desired: bool = False
+	) -> bool:
+		add_or_remove = "-aG" if desired else "-rG"
+		msg = "Enforcing sudo rights for user"\
+			if desired else "Removing sudo rights for user"
+		err_msg = "Failed to enforce sudo rights for user"\
+			if desired else "Failed to remove sudo rights from user"
+
+		user_in_sudo = self.is_user_in_group(
+			username=username,
+			groupname="sudo",
+		)
+		if desired is user_in_sudo:
+			return True
+
+		try:
+			self.log(f"{msg} {username}")
+			subprocess.run(
+				[
+					"/usr/sbin/usermod",
+					add_or_remove,
+					"sudo",
+					username,
+				],
+				check=True,
+				stdout=subprocess.DEVNULL,
+			)
+			return True
+		except subprocess.CalledProcessError as e:
+			self.log(f"{err_msg} {username}: {str(e)}")
+			return False
+
+	def _ensure_local_user_home_dir_exists(self, username: str) -> None:
 		home_dir = self._get_user_homedir(username)
 		if not os.path.exists(home_dir):
 			os.makedirs(home_dir)
