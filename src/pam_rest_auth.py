@@ -20,6 +20,9 @@ PamHandle = PamHandleProtocol
 def pam_sm_authenticate(
 	pamh: PamHandleProtocol, flags: int, argv: list[str]
 ) -> int:
+	if not (os.geteuid() == 0 and os.geteuid() == 0):
+		raise Exception("Bad UID.")
+
 	try:
 		# Get and validate username first
 		try:
