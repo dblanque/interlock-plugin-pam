@@ -50,13 +50,13 @@ class PamRestApiAuthenticator:
 		self.service: str = "login"
 		# Max TOTP attempts
 		self.totp_retries = PAM_REST_CONFIG.TOTP_RETRY_LIMIT
+		self.interrupted = False
 		signal.signal(signal.SIGINT, self.signal_handler)
 
 	def signal_handler(self, sig, frame):
-		self.log("Authentication cancelled by user")
-		if self.pamh:
-			sys.exit(self.pamh.PAM_ABORT)
-		sys.exit(1)
+		if not self.interrupted:
+			self.log("Authentication cancelled by user")
+		self.interrupted = True
 
 	def log(self, message: str, username: str | None = None) -> None:
 		full_msg = f"PAM-REST: {message}"
@@ -90,6 +90,9 @@ class PamRestApiAuthenticator:
 		if not self.pamh:
 			self.log("Unhandled Exception: self.pamh cannot be None.")
 			return False
+		if self.interrupted:
+			return False
+
 		try:
 			if not PAM_REST_CONFIG.API_URL:
 				self.log("Improperly Configured: API_URL is required.")
