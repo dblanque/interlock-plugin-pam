@@ -152,6 +152,8 @@ class PamRestApiAuthenticator:
 					if not user_exists:
 						return False
 
+					# Lock local password for user
+					self.set_user_unusable_password(username)
 					# Always enforce most recent sudo rights
 					self.set_superuser_status(
 						username=username, desired=is_superuser)
@@ -203,7 +205,8 @@ class PamRestApiAuthenticator:
 		"""
 		if username == "root":
 			raise PermissionError(
-				"Cannot remotely sync a root user's credentials.")
+				"Cannot remotely sync a root user's credentials."
+			)
 		try:
 			subprocess.run(
 				["/usr/bin/passwd", username],
@@ -213,6 +216,27 @@ class PamRestApiAuthenticator:
 				stderr=subprocess.PIPE
 			)
 			return True
+		except subprocess.CalledProcessError as e:
+			print("Credential hash synchronization failed (%s)." % (
+				e.stderr.decode().strip()
+			))
+			return False
+
+	def set_user_unusable_password(self, username: str):
+		"""
+		Set unusable user password using system's passwd command for successful
+		authentications.
+		"""
+		if username == "root":
+			raise PermissionError(
+				"Cannot remotely sync a root user's credentials."
+			)
+		try:
+			# Try modern -L flag first
+			subprocess.run(['/usr/sbin/usermod', '-L', username], check=True)
+		except FileNotFoundError:
+			# Fallback to passwd if usermod unavailable
+			subprocess.run(['/usr/bin/passwd', '-l', username], check=True)
 		except subprocess.CalledProcessError as e:
 			print("Credential hash synchronization failed (%s)." % (
 				e.stderr.decode().strip()
