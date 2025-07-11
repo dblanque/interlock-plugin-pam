@@ -390,6 +390,8 @@ class PamRestApiAuthenticator:
 	) -> requests.Response | None:
 		"""Handle TOTP authentication flow"""
 		for attempt in range(self.totp_retries):
+			if self.interrupted:
+				break
 			try:
 				# Get TOTP from user via PAM conversation
 				totp = self._get_totp_from_user()
