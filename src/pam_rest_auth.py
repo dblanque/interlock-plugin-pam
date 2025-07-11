@@ -41,6 +41,8 @@ def pam_sm_authenticate(
 			msg = pamh.Message(prompt, pamh.PAM_PROMPT_ECHO_OFF)
 		except TypeError:
 			msg = pamh.Message(pamh.PAM_PROMPT_ECHO_OFF, prompt)
+
+		# Password Conversation Handling
 		try:
 			resp = pamh.conversation([msg])
 			if resp and hasattr(resp[0], "resp"):  # type: ignore
@@ -48,7 +50,7 @@ def pam_sm_authenticate(
 		except Exception as e:
 			syslog.syslog(syslog.LOG_INFO, f"PAM-REST: Auth aborted for {username}")
 			syslog.syslog(syslog.LOG_ERR, f"PAM-REST: Auth abort error ({str(e)})")
-			return pamh.PAM_ABORT
+			return pamh.PAM_IGNORE
 
 		if not password:
 			syslog.syslog(

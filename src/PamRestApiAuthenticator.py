@@ -20,6 +20,7 @@ class PamHandleProtocol(Protocol):
 
 	PAM_SUCCESS: int
 	PAM_ABORT: int
+	PAM_IGNORE: int
 	PAM_AUTH_ERR: int
 	PAM_SYSTEM_ERR: int
 	PAM_USER_UNKNOWN: int
