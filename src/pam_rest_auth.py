@@ -57,11 +57,16 @@ def pam_sm_authenticate(
 				syslog.LOG_WARNING, f"PAM-REST: No password for {username}"
 			)
 			return pamh.PAM_AUTH_ERR
+
 		# Initialize authenticator with PAM handle
 		authenticator = PamRestApiAuthenticator(pamh=pamh)
 		authenticator.service = pamh.service
 
-		if not authenticator.authenticate(username, password):
+		# Perform authentication
+		is_authenticated = authenticator.authenticate(username, password)
+		if type(is_authenticated) is int:
+			return is_authenticated
+		elif not is_authenticated:
 			syslog.syslog(
 				syslog.LOG_WARNING, f"PAM-REST: Auth failed for {username}"
 			)

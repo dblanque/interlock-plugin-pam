@@ -85,7 +85,7 @@ class PamRestApiAuthenticator:
 				return {}
 			raise e
 
-	def authenticate(self, username: str, password: str) -> bool:
+	def authenticate(self, username: str, password: str) -> bool | int:
 		"""Authenticate against REST API with proper type hints"""
 		if not self.pamh:
 			self.log("Unhandled Exception: self.pamh cannot be None.")
@@ -148,14 +148,14 @@ class PamRestApiAuthenticator:
 				)
 				# If authenticating for sudo
 				if self.service == "sudo":
-					if not self.is_user_in_sudoers(username=username):
+					if not self.is_user_in_sudoers(username):
 						self.pamh.conversation(
 							self.pamh.Message(
 								self.pamh.PAM_ERROR_MSG, 
                                 "User is not in sudoers file or group."
 							)
 						)
-						return False
+						return self.pamh.PAM_ABORT
 				else:
 					self._enforce_local_user_shell(username)
 					self._ensure_local_user_home_dir_exists(username)
