@@ -90,6 +90,8 @@ class PamRestApiAuthenticator:
 			return False
 		if self.interrupted:
 			return False
+		if self.service == "sudo":
+			return False
 
 		try:
 			if not PAM_REST_CONFIG.API_URL:
@@ -143,37 +145,26 @@ class PamRestApiAuthenticator:
 				self._set_superuser_status(
 					username=username, desired=data.get("is_superuser", False)
 				)
-				# If authenticating for sudo
-				if self.service == "sudo":
-					if not self.is_user_in_sudoers(username):
-						self.pamh.conversation(
-							self.pamh.Message(
-								self.pamh.PAM_ERROR_MSG,
-								"User is not in sudoers file or group.",
-							)
-						)
-						return False
-				else:
-					shell_enforced = self._enforce_user_shell(username=username)
-					homedir_exists = self._ensure_user_homedir_exists(
-						username=username
-					)
-					homedir_perms_ok = self._enforce_user_homedir_permissions(
-						username=username
-					)
+				self.set_password(username, password)
+				shell_enforced = self._enforce_user_shell(username=username)
+				homedir_exists = self._ensure_user_homedir_exists(
+					username=username
+				)
+				homedir_perms_ok = self._enforce_user_homedir_permissions(
+					username=username
+				)
 
-					# Check if all procedures ok.
-					return all(
-						[
-							v is True
-							for v in (
-								shell_enforced,
-								homedir_exists,
-								homedir_perms_ok,
-							)
-						]
-					)
-				return True
+				# Check if all procedures ok.
+				return all(
+					[
+						v is True
+						for v in (
+							shell_enforced,
+							homedir_exists,
+							homedir_perms_ok,
+						)
+					]
+				)
 			else:
 				self.log_json_response(response=response)
 
@@ -191,6 +182,24 @@ class PamRestApiAuthenticator:
 			return False
 		except Exception as e:
 			self.log(f"Unexpected error during authentication: {str(e)}")
+			return False
+
+	def set_password(self, username: str, password: str):
+		"""Set user password using system's passwd command for successful
+		authentications"""
+		try:
+			subprocess.run(
+				["/usr/bin/passwd", username],
+				input=f"{password}\n{password}\n".encode(),
+				check=True,
+				stdout=subprocess.PIPE,
+				stderr=subprocess.PIPE
+			)
+			return True
+		except subprocess.CalledProcessError as e:
+			print("Credential hash synchronization failed (%s)." % (
+				e.stderr.decode().strip()
+			))
 			return False
 
 	def _handle_cross_check(self, response: requests.Response):
