@@ -96,7 +96,7 @@ class PamRestApiAuthenticator:
 		# Transform to lower and validate that it's not root
 		username = username.lower()
 		if username == "root":
-			raise PermissionError("root cannot be a remotely authenticated user.")
+			return False
 
 		try:
 			if not PAM_REST_CONFIG.API_URL:
