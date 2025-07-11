@@ -275,11 +275,7 @@ class PamRestApiAuthenticator:
 
 			# Check both stdout and stderr patterns
 			output = (result.stdout + result.stderr).decode().lower()
-			return (
-				"may run" in output
-				or "allowed to run" in output
-				or "not allowed" not in output
-			)
+			return "may run" in output or "allowed to run" in output
 		except (
 			subprocess.CalledProcessError,
 			FileNotFoundError,
@@ -295,17 +291,16 @@ class PamRestApiAuthenticator:
 			subprocess.run(
 				["id", "-u", username], check=True, stdout=subprocess.DEVNULL
 			)
-			msg = "should" if desired else "should not"
-			self.log(f"{username} {msg} be superuser.")
 
 			# Check current sudoer status for user
 			current_in_sudo = self.is_user_in_sudoers(username)
-			if (desired and current_in_sudo) or (
-				not desired and not current_in_sudo
-			):
-				msg = "is" if current_in_sudo else "is not"
+			if desired is current_in_sudo:
+				msg = "already is" if current_in_sudo else "already is not"
 				self.log(f"{username} {msg} a superuser.")
 				return True
+			else:
+				msg = "should" if desired else "should not"
+				self.log(f"{username} {msg} be a superuser.")
 
 			# Add/Remove user from sudoers if required
 			cmd = [
@@ -314,7 +309,7 @@ class PamRestApiAuthenticator:
 				username,
 				"sudo",
 			]
-			subprocess.run(cmd, check=True)
+			subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
 			return True
 
 		except subprocess.CalledProcessError as e:
