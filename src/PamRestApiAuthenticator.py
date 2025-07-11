@@ -375,11 +375,11 @@ class PamRestApiAuthenticator:
 				subprocess.run(
 					[
 						"/usr/sbin/useradd",
-						"-D",
-						"--shell",
+						"-s", # --shell
 						USER_SHELL_FALLBACK,  # No shell access
-						"--home-dir",
+						"-d", # --home-dir
 						self._get_user_homedir(username),
+						"-m", # --create-home
 						username,
 					],
 					check=True,
