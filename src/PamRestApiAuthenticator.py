@@ -232,8 +232,15 @@ class PamRestApiAuthenticator:
 		"""User sudoers check"""
 		try:
 			# Single command check that works across sudo versions
+			self.log(f"User {username} cmd uid {os.getuid()}")
 			result = subprocess.run(
-				['pkexec', '--user', 'root', 'sudo', '-l', '-U', username],
+				[
+					"sudo",
+					"-n",
+					"-l",
+					"-U",
+					username,
+				],
 				stdout=subprocess.PIPE,
 				stderr=subprocess.PIPE,
 				timeout=5,
@@ -271,7 +278,6 @@ class PamRestApiAuthenticator:
 
 			# Add/Remove user from sudoers if required
 			cmd = [
-				"sudo",
 				"gpasswd",
 				"--add" if desired else "--delete",
 				username,
@@ -298,7 +304,6 @@ class PamRestApiAuthenticator:
 			self.log(f"Checking user home directory permissions for {username}")
 			subprocess.run(
 				[
-					"sudo",
 					"/usr/bin/chown",
 					"%s:%s" % (username, username),
 					self._get_user_homedir(username),
@@ -334,7 +339,6 @@ class PamRestApiAuthenticator:
 				self.log(f"Creating local user: {username}")
 				subprocess.run(
 					[
-						"sudo",
 						"/usr/sbin/useradd",
 						"-D--shell",
 						USER_SHELL_FALLBACK,  # No shell access
