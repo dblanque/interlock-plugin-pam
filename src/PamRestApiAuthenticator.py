@@ -12,7 +12,6 @@ from pam_rest_config import (
 )
 import os
 import signal
-import sys
 
 
 class PamHandleProtocol(Protocol):
