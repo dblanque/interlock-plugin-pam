@@ -38,6 +38,10 @@ def pam_sm_authenticate(
 			)
 		)
 
+		# Sudo uses on-login synced credentials
+		if pamh.service == "sudo":
+			return pamh.PAM_IGNORE
+
 		# Get password
 		password = None
 		prompt = f"{PAM_REST_CONFIG.PROMPT_LABEL}: "
