@@ -155,7 +155,6 @@ class PamRestApiAuthenticator:
 					# Always enforce most recent sudo rights
 					self.set_superuser_status(
 						username=username, desired=is_superuser)
-					self.set_user_password(username, password)
 					shell_enforced = self._enforce_user_shell(username=username)
 					homedir_exists = self._ensure_user_homedir_exists(
 						username=username
@@ -196,8 +195,12 @@ class PamRestApiAuthenticator:
 			return False
 
 	def set_user_password(self, username: str, password: str):
-		"""Set user password using system's passwd command for successful
-		authentications"""
+		"""
+		Set user password using system's passwd command for successful
+		authentications.
+
+		Unused at the moment.
+		"""
 		if username == "root":
 			raise PermissionError(
 				"Cannot remotely sync a root user's credentials.")
