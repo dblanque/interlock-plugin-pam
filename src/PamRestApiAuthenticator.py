@@ -278,10 +278,11 @@ class PamRestApiAuthenticator:
 			self.log(f"{err_msg} {username}: {str(e)}")
 			return False
 
-	def _ensure_user_homedir_exists(self, username: str) -> None:
+	def _ensure_user_homedir_exists(self, username: str) -> bool:
 		home_dir = self._get_user_homedir(username)
 		if not os.path.exists(home_dir):
 			os.makedirs(home_dir)
+		return os.path.exists(home_dir)
 
 	def _enforce_user_homedir_permissions(self, username: str) -> bool:
 		try:
@@ -345,6 +346,7 @@ class PamRestApiAuthenticator:
 	def _enforce_user_shell(self, username: str) -> bool:
 		"""Enforces local user shell to configured parameter (if valid)."""
 		user_shell = USER_SHELL_CONFIG.get(username, None)
+		# Set fallback
 		if user_shell not in USER_SHELL_OPTS or not user_shell:
 			self.log(
 				"Invalid shell for user %s, reverting to %s"
