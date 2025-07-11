@@ -232,7 +232,15 @@ class PamRestApiAuthenticator:
 		"""User sudoers check"""
 		try:
 			# Single command check that works across sudo versions
-			self.log(f"User {username} cmd uid {os.getuid()}")
+			# Verify non-interactive sudo works
+			subprocess.run(
+				["sudo", "-n", "true"],
+				check=True,
+				stdout=subprocess.DEVNULL,
+				stderr=subprocess.DEVNULL,
+			)
+
+			# Check if user can sudo
 			result = subprocess.run(
 				[
 					"sudo",
