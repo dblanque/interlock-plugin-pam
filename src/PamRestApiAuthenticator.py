@@ -395,6 +395,8 @@ class PamRestApiAuthenticator:
 			try:
 				# Get TOTP from user via PAM conversation
 				totp = self._get_totp_from_user()
+				if not totp:
+					continue
 
 				# Verify TOTP with API
 				response = requests.post(
