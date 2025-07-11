@@ -303,6 +303,8 @@ class PamRestApiAuthenticator:
 			if (desired and current_in_sudo) or (
 				not desired and not current_in_sudo
 			):
+				msg = "is" if current_in_sudo else "is not"
+				self.log(f"{username} {msg} a superuser.")
 				return True
 
 			# Add/Remove user from sudoers if required
