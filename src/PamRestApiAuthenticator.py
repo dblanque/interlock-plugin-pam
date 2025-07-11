@@ -289,7 +289,7 @@ class PamRestApiAuthenticator:
 			return False
 
 	def set_superuser_status(self, username: str, desired: bool) -> bool:
-		"""Safer privilege modification"""
+		"""Privilege modification"""
 		try:
 			# Verify user exists
 			subprocess.run(
@@ -314,7 +314,7 @@ class PamRestApiAuthenticator:
 				username,
 				"sudo",
 			]
-			subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
+			subprocess.run(cmd, check=True)
 			return True
 
 		except subprocess.CalledProcessError as e:
