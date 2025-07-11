@@ -241,6 +241,11 @@ class PamRestApiAuthenticator:
 
 	def is_user_in_sudoers(self, username: str) -> bool:
 		"""User sudoers check"""
+		# This should not be executed within a sudo command context,
+		# could cause a loop!
+		if self.service == "sudo":
+			return False
+
 		try:
 			# Single command check that works across sudo versions
 			# Verify non-interactive sudo works
