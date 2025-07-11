@@ -31,7 +31,11 @@ def pam_sm_authenticate(
 
 		# Log authentication attempt with user
 		syslog.syslog(
-			syslog.LOG_INFO, f"PAM-REST: Authentication attempt for {username}"
+			syslog.LOG_INFO,
+			"PAM-REST: Authentication attempt for %s (service: %s)" % (
+				username,
+				pamh.service,
+			)
 		)
 
 		# Get password
