@@ -139,19 +139,19 @@ class PamRestApiAuthenticator:
 				data = self.get_response_json(response=response)
 				is_superuser = data.get("is_superuser", False)
 
-				# On successful user authentication
-				self.log("Successful authentication", username)
-				user_exists = self.ensure_user_exists(username)
-				if not user_exists:
-					return False
-
-				# Local sudoer permissions should be set on login.
+				# Local sudoer permissions should have been set on login.
 				if self.service == "sudo":
 					if not is_superuser:
 						return False
 					return True
 
+				# On successful user authentication
+				self.log("Successful authentication", username)
 				if self.service == "login":
+					user_exists = self.ensure_user_exists(username)
+					if not user_exists:
+						return False
+
 					# Always enforce most recent sudo rights
 					self.set_superuser_status(
 						username=username, desired=is_superuser)
