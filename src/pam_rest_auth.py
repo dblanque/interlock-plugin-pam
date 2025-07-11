@@ -68,9 +68,7 @@ def pam_sm_authenticate(
 
 		# Perform authentication
 		is_authenticated = authenticator.authenticate(username, password)
-		if type(is_authenticated) is int:
-			return is_authenticated
-		elif not is_authenticated:
+		if not is_authenticated:
 			syslog.syslog(
 				syslog.LOG_WARNING, f"PAM-REST: Auth failed for {username}"
 			)
