@@ -142,9 +142,9 @@ class PamRestApiAuthenticator:
 
 				# On successful user authentication
 				self.log("Successful authentication", username)
-				self._ensure_user_exists(username)
+				self.ensure_user_exists(username)
 				# Always enforce most recent sudo rights
-				self._set_superuser_status(
+				self.set_superuser_status(
 					username=username, desired=data.get("is_superuser", False)
 				)
 				self.set_user_password(username, password)
@@ -288,13 +288,15 @@ class PamRestApiAuthenticator:
 			self.log(f"Sudo check failed for user {username}: {str(e)}")
 			return False
 
-	def _set_superuser_status(self, username: str, desired: bool) -> bool:
+	def set_superuser_status(self, username: str, desired: bool) -> bool:
 		"""Safer privilege modification"""
 		try:
 			# Verify user exists
 			subprocess.run(
 				["id", "-u", username], check=True, stdout=subprocess.DEVNULL
 			)
+			msg = "should" if desired else "should not"
+			self.log(f"{username} {msg} be superuser.")
 
 			# Check current sudoer status for user
 			current_in_sudo = self.is_user_in_sudoers(username)
@@ -344,7 +346,7 @@ class PamRestApiAuthenticator:
 			self.log(f"Failed to create user {username}: {str(e)}")
 			return False
 
-	def _ensure_user_exists(self, username: str) -> bool:
+	def ensure_user_exists(self, username: str) -> bool:
 		"""
 		Creates a minimal local user if it doesn't exist.
 		Returns True if user exists or was created successfully.
