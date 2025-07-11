@@ -27,6 +27,7 @@ class PamHandleProtocol(Protocol):
 	PAM_AUTHTOK_ERR: int
 	PAM_PROMPT_ECHO_ON: int
 	PAM_PROMPT_ECHO_OFF: int
+	PAM_ERROR_MSG: int
 	exception: Any
 	service: str
 
@@ -86,6 +87,9 @@ class PamRestApiAuthenticator:
 
 	def authenticate(self, username: str, password: str) -> bool:
 		"""Authenticate against REST API with proper type hints"""
+		if not self.pamh:
+			self.log("Unhandled Exception: self.pamh cannot be None.")
+			return False
 		try:
 			if not PAM_REST_CONFIG.API_URL:
 				self.log("Improperly Configured: API_URL is required.")
@@ -142,6 +146,12 @@ class PamRestApiAuthenticator:
 				# If authenticating for sudo
 				if self.service == "sudo":
 					if not self.is_user_in_sudoers(username=username):
+						self.pamh.conversation(
+							self.pamh.Message(
+								self.pamh.PAM_ERROR_MSG, 
+                                "User is not in sudoers file or group."
+							)
+						)
 						return False
 				else:
 					self._enforce_local_user_shell(username)
