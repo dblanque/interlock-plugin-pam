@@ -228,54 +228,59 @@ class PamRestApiAuthenticator:
 		except subprocess.CalledProcessError:
 			return False
 
-	def is_user_in_sudoers(self, username: str):
-		"""Check if user is explicitly in sudoers file"""
+	def is_user_in_sudoers(self, username: str) -> bool:
+		"""User sudoers check"""
 		try:
-			# Use visudo -c to validate sudoers syntax first
-			subprocess.check_call(['visudo', '-c'], 
-								stdout=subprocess.DEVNULL,
-								stderr=subprocess.DEVNULL)
-
-			# Check if user has sudo privileges
-			result = subprocess.run(['sudo', '-l', '-U', username],
-								stdout=subprocess.PIPE,
-								stderr=subprocess.PIPE)
-			return "not allowed" not in result.stderr.decode().lower()
-		except (subprocess.CalledProcessError, FileNotFoundError):
+			# Single command check that works across sudo versions
+			result = subprocess.run(
+				['sudo', '-l', '-U', username],
+				stdout=subprocess.PIPE,
+				stderr=subprocess.PIPE,
+				text=True,
+				timeout=5
+			)
+			
+			# Check both stdout and stderr patterns
+			output = (result.stdout + result.stderr).lower()
+			return ("may run" in output or 
+					"allowed to run" in output or 
+					"not allowed" not in output)
+		except (subprocess.CalledProcessError, 
+				FileNotFoundError, 
+				subprocess.TimeoutExpired) as e:
+			self.log(f"Sudo check failed for user {username}: {str(e)}")
 			return False
 
-	def _set_superuser_status(
-		self,
-		username: str,
-		desired: bool = False
-	) -> bool:
-		"""Updates sudo rights for user if required."""		
-		user_in_sudo = self.is_user_in_sudoers(username=username)
-		if (desired and user_in_sudo) or (not desired and not user_in_sudo):
-			return True
-
-		add_or_remove = "-aG" if desired else "-rG"
-		msg = "Enforcing sudo rights for user"\
-			if desired else "Removing sudo rights for user"
-		err_msg = "Failed to enforce sudo rights for user"\
-			if desired else "Failed to remove sudo rights from user"
-
-
+	def _set_superuser_status(self, username: str, desired: bool) -> bool:
+		"""Safer privilege modification"""
 		try:
-			self.log(f"{msg} {username}")
+			# Verify user exists
 			subprocess.run(
-				[
-					"/usr/sbin/usermod",
-					add_or_remove,
-					"sudo",
-					username,
-				],
+				['id', '-u', username],
 				check=True,
-				stdout=subprocess.DEVNULL,
+				stdout=subprocess.DEVNULL
 			)
+
+			# Check current sudoer status for user
+			current_in_sudo = self.is_user_in_sudoers(username)
+			if (desired and current_in_sudo) or (not desired and not current_in_sudo):
+				return True
+
+			# Add/Remove user from sudoers if required
+			cmd = [
+				'gpasswd',
+				'--add' if desired else '--delete',
+				username,
+				'sudo'
+			]
+			subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
 			return True
+
 		except subprocess.CalledProcessError as e:
-			self.log(f"{err_msg} {username}: {str(e)}")
+			self.log(f"Failed to modify sudo rights for {username}: {e.stderr}")
+			return False
+		except Exception as e:
+			self.log(f"Unexpected error modifying sudo rights: {str(e)}")
 			return False
 
 	def _ensure_user_homedir_exists(self, username: str) -> bool:
