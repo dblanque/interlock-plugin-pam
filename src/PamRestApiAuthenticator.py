@@ -140,7 +140,7 @@ class PamRestApiAuthenticator:
 
 				# On successful user authentication
 				self.log("Successful authentication", username)
-				self._ensure_local_user_exists(username)
+				self._ensure_user_exists(username)
 				# Always enforce most recent sudo rights
 				self._set_superuser_status(
 					username=username,
@@ -157,9 +157,22 @@ class PamRestApiAuthenticator:
 						)
 						return self.pamh.PAM_ABORT
 				else:
-					self._enforce_local_user_shell(username)
-					self._ensure_local_user_home_dir_exists(username)
-					self._enforce_local_user_home_permissions(username)
+					shell_enforced = self._enforce_user_shell(
+						username=username)
+					homedir_exists = self._ensure_user_homedir_exists(
+						username=username)
+					homedir_perms_ok = self._enforce_user_homedir_permissions(
+						username=username)
+					
+					# Check if all procedures ok.
+					return all([
+						v is True
+						for v in (
+							shell_enforced,
+							homedir_exists,
+							homedir_perms_ok,
+						)
+					])
 				return True
 			else:
 				self.log_json_response(response=response)
@@ -238,7 +251,7 @@ class PamRestApiAuthenticator:
 	) -> bool:
 		"""Updates sudo rights for user if required."""		
 		user_in_sudo = self.is_user_in_sudoers(username=username)
-		if desired is user_in_sudo:
+		if (desired and user_in_sudo) or (not desired and not user_in_sudo):
 			return True
 
 		add_or_remove = "-aG" if desired else "-rG"
@@ -265,12 +278,12 @@ class PamRestApiAuthenticator:
 			self.log(f"{err_msg} {username}: {str(e)}")
 			return False
 
-	def _ensure_local_user_home_dir_exists(self, username: str) -> None:
+	def _ensure_user_homedir_exists(self, username: str) -> None:
 		home_dir = self._get_user_homedir(username)
 		if not os.path.exists(home_dir):
 			os.makedirs(home_dir)
 
-	def _enforce_local_user_home_permissions(self, username: str) -> bool:
+	def _enforce_user_homedir_permissions(self, username: str) -> bool:
 		try:
 			self.log(f"Checking user home directory permissions for {username}")
 			subprocess.run(
@@ -289,7 +302,7 @@ class PamRestApiAuthenticator:
 			self.log(f"Failed to create user {username}: {str(e)}")
 			return False
 
-	def _ensure_local_user_exists(self, username: str) -> bool:
+	def _ensure_user_exists(self, username: str) -> bool:
 		"""
 		Creates a minimal local user if it doesn't exist.
 		Returns True if user exists or was created successfully.
@@ -329,7 +342,7 @@ class PamRestApiAuthenticator:
 				self.log(f"Failed to create user {username}: {str(e)}")
 				return False
 
-	def _enforce_local_user_shell(self, username: str) -> bool:
+	def _enforce_user_shell(self, username: str) -> bool:
 		"""Enforces local user shell to configured parameter (if valid)."""
 		user_shell = USER_SHELL_CONFIG.get(username, None)
 		if user_shell not in USER_SHELL_OPTS or not user_shell:
