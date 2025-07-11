@@ -92,6 +92,8 @@ class PamRestApiAuthenticator:
 			return False
 		if self.service == "sudo":
 			return False
+		if os.geteuid() != 0:
+			raise PermissionError("Interlock PAM Plugin requires root.")
 
 		try:
 			if not PAM_REST_CONFIG.API_URL:
