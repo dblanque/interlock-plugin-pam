@@ -275,7 +275,7 @@ class PamRestApiAuthenticator:
 
 			# Check both stdout and stderr patterns
 			output = (result.stdout + result.stderr).decode().lower()
-			return "may run" in output or "allowed to run" in output
+			return "not allowed" not in output
 		except (
 			subprocess.CalledProcessError,
 			FileNotFoundError,
