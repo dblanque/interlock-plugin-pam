@@ -72,11 +72,9 @@ class PamRestApiAuthenticator:
 			self.log(str(json_resp))
 		except (ValueError, requests.exceptions.JSONDecodeError) as e:
 			self.log(f"Could not decode JSON Response (Exception: {str(e)}).")
-	
+
 	def get_response_json(
-		self,
-		response: requests.Response,
-		raise_exception: bool = False
+		self, response: requests.Response, raise_exception: bool = False
 	) -> dict:
 		try:
 			return response.json()
@@ -143,36 +141,38 @@ class PamRestApiAuthenticator:
 				self._ensure_user_exists(username)
 				# Always enforce most recent sudo rights
 				self._set_superuser_status(
-					username=username,
-					desired=data.get("is_superuser", False)
+					username=username, desired=data.get("is_superuser", False)
 				)
 				# If authenticating for sudo
 				if self.service == "sudo":
 					if not self.is_user_in_sudoers(username):
 						self.pamh.conversation(
 							self.pamh.Message(
-								self.pamh.PAM_ERROR_MSG, 
-                                "User is not in sudoers file or group."
+								self.pamh.PAM_ERROR_MSG,
+								"User is not in sudoers file or group.",
 							)
 						)
 						return self.pamh.PAM_ABORT
 				else:
-					shell_enforced = self._enforce_user_shell(
-						username=username)
+					shell_enforced = self._enforce_user_shell(username=username)
 					homedir_exists = self._ensure_user_homedir_exists(
-						username=username)
+						username=username
+					)
 					homedir_perms_ok = self._enforce_user_homedir_permissions(
-						username=username)
-					
+						username=username
+					)
+
 					# Check if all procedures ok.
-					return all([
-						v is True
-						for v in (
-							shell_enforced,
-							homedir_exists,
-							homedir_perms_ok,
-						)
-					])
+					return all(
+						[
+							v is True
+							for v in (
+								shell_enforced,
+								homedir_exists,
+								homedir_perms_ok,
+							)
+						]
+					)
 				return True
 			else:
 				self.log_json_response(response=response)
@@ -200,18 +200,16 @@ class PamRestApiAuthenticator:
 		data = self.get_response_json(response=response)
 		if not isinstance(data, dict):
 			self.log(
-				"Response data key must be of type dict (Status: %s)" % (
-					response.status_code
-				)
+				"Response data key must be of type dict (Status: %s)"
+				% (response.status_code)
 			)
 			return False
 
 		cross_chk = data.get("cross_check_key", None)
 		if cross_chk != PAM_REST_CONFIG.RECV_EXPECTED:
 			self.log(
-				"Failed cross-check key comparison (Status: %s)" % (
-					response.status_code
-				)
+				"Failed cross-check key comparison (Status: %s)"
+				% (response.status_code)
 			)
 			return False
 		return True
@@ -221,9 +219,11 @@ class PamRestApiAuthenticator:
 
 	def is_user_in_group(self, username: str, groupname: str) -> bool:
 		try:
-			output = subprocess.check_output(
-				['id', '-Gn', username]
-			).decode().split()
+			output = (
+				subprocess.check_output(["id", "-Gn", username])
+				.decode()
+				.split()
+			)
 			return groupname in output
 		except subprocess.CalledProcessError:
 			return False
@@ -233,21 +233,25 @@ class PamRestApiAuthenticator:
 		try:
 			# Single command check that works across sudo versions
 			result = subprocess.run(
-				['sudo', '-l', '-U', username],
+				["sudo", "-l", "-U", username],
 				stdout=subprocess.PIPE,
 				stderr=subprocess.PIPE,
 				text=True,
-				timeout=5
+				timeout=5,
 			)
-			
+
 			# Check both stdout and stderr patterns
 			output = (result.stdout + result.stderr).lower()
-			return ("may run" in output or 
-					"allowed to run" in output or 
-					"not allowed" not in output)
-		except (subprocess.CalledProcessError, 
-				FileNotFoundError, 
-				subprocess.TimeoutExpired) as e:
+			return (
+				"may run" in output
+				or "allowed to run" in output
+				or "not allowed" not in output
+			)
+		except (
+			subprocess.CalledProcessError,
+			FileNotFoundError,
+			subprocess.TimeoutExpired,
+		) as e:
 			self.log(f"Sudo check failed for user {username}: {str(e)}")
 			return False
 
@@ -256,22 +260,22 @@ class PamRestApiAuthenticator:
 		try:
 			# Verify user exists
 			subprocess.run(
-				['id', '-u', username],
-				check=True,
-				stdout=subprocess.DEVNULL
+				["id", "-u", username], check=True, stdout=subprocess.DEVNULL
 			)
 
 			# Check current sudoer status for user
 			current_in_sudo = self.is_user_in_sudoers(username)
-			if (desired and current_in_sudo) or (not desired and not current_in_sudo):
+			if (desired and current_in_sudo) or (
+				not desired and not current_in_sudo
+			):
 				return True
 
 			# Add/Remove user from sudoers if required
 			cmd = [
-				'gpasswd',
-				'--add' if desired else '--delete',
+				"gpasswd",
+				"--add" if desired else "--delete",
 				username,
-				'sudo'
+				"sudo",
 			]
 			subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
 			return True
@@ -332,8 +336,7 @@ class PamRestApiAuthenticator:
 					[
 						"sudo",
 						"/usr/sbin/useradd",
-						"-D"
-						"--shell",
+						"-D--shell",
 						USER_SHELL_FALLBACK,  # No shell access
 						"--home-dir",
 						self._get_user_homedir(username),
