@@ -272,6 +272,7 @@ class PamRestApiAuthenticator:
 
 			# Add/Remove user from sudoers if required
 			cmd = [
+				"sudo",
 				"gpasswd",
 				"--add" if desired else "--delete",
 				username,
